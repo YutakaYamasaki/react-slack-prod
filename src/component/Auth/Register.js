@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import {Grid, Form, Segment, Button, Header, Message, Icon} from 'semantic-ui-react';
 import {Link} from 'react-router-dom';
 import firebase from '../../firebase';
+import md5 from 'md5';
 
 class Register extends Component{
     state={
@@ -9,7 +10,9 @@ class Register extends Component{
         email:'',
         password:'',
         passwordConfirmation:'',
-        errors:[]
+        errors:[],
+        loading: false,
+        usersRef: firebase.database().ref('users')
     }
     handleChange = ( event )=>{
         this.setState({[event.target.name]: event.target.value })
@@ -49,20 +52,50 @@ class Register extends Component{
     handleSubmit = ( event ) =>{
         event.preventDefault();
         if(this.isFormValid()){
+            this.setState({ errors:[], loading:true })
             firebase
                 .auth()
                 .createUserWithEmailAndPassword(this.state.email, this.state.password)
                 .then((createdUser)=>{
-                    console.log(createdUser);
+                    createdUser.user.updateProfile({
+                        displayName: this.state.username,
+                        photoURL: `http://gravatar.com/avatar/${md5(createdUser.user.email)}?d=idention`
+                    })
+                    .then(()=>{
+                        this.saveUser(createdUser).then(()=>{
+                            console.log('user saved');
+                        })
+                    })
+                    .catch((err)=>{
+                        console.error(err)
+                        this.setState({
+                            errors:this.setState.error.concat(err),
+                             loading:false })
+                    })
                 })
                 .catch((error)=>{
                     console.log(error);
+                    this.setState({errors: this.state.errors.concat(error), loading: false })
                 })
         }
 
     }
+    handleInputError = (errors, inputName) => {
+        return errors.some(error => 
+            error.message.toLowerCase().includes(inputName)
+        ) ?
+        'error'
+        :
+        ''
+    }
+    saveUser = createdUser => {
+        return this.state.usersRef.child(createdUser.user.uid).set({
+            name: createdUser.user.displayName,
+            avatar: createdUser.user.photoURL
+        });
+    }
     render(){
-        const { username, email, passsword, passwordConfirmation, errors } = this.state;
+        const { username, email, password, passwordConfirmation, errors, loading } = this.state;
         return(
             <Grid textAlign="center" verticalAlign="middle" className="app">
                 <Grid.Column style={{maxWidth: 450}}>
@@ -79,6 +112,7 @@ class Register extends Component{
                             placeholder="Username"
                             type="text"
                             onChange={this.handleChange}
+                             value={username}
                             />
                             <Form.Input fluid 
                             name="email" 
@@ -87,6 +121,7 @@ class Register extends Component{
                             placeholder="Email Address"
                             type="email"
                             onChange={this.handleChange}
+                            value={email}
                             />
                             <Form.Input fluid 
                             name="password" 
@@ -95,6 +130,8 @@ class Register extends Component{
                             placeholder="password"
                             type="password"
                             onChange={this.handleChange}
+                            value={password}
+                            className={this.handleInputError(errors,'password')}
                             />
                             <Form.Input fluid 
                             name="passwordConfirmation" 
@@ -103,8 +140,10 @@ class Register extends Component{
                             placeholder="passwordconfirmation"
                             type="password"
                             onChange={this.handleChange}
+                            value={passwordConfirmation}
+                            className={this.handleInputError(errors,'password')}
                             />
-                            <Button color="orange" fluid size="large">Submit</Button>
+                            <Button disabled={loading} className={loading ?  'loading' : '' } color="orange" fluid size="large">Submit</Button>
                         </Segment>
                         {errors.length>0 &&(
                             <Message>
