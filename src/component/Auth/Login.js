@@ -28,7 +28,7 @@ class Login extends Component{
                     .catch(err=>{
                         console.error(err);
                         this.setState({
-                            errors: this.setState.errors.concat(err),
+                            errors: this.state.errors.concat(err),
                             loading:false
                         })
                     })
